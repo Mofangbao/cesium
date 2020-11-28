@@ -1,24 +1,19 @@
-/*global define*/
-define([
-        '../Core/freezeObject'
-    ], function(
-        freezeObject) {
-    "use strict";
+import WebGLConstants from "../Core/WebGLConstants.js";
 
-    /**
-     * @private
-     */
-    var TextureWrap = {
-        CLAMP_TO_EDGE : 0x812F,
-        REPEAT : 0x2901,
-        MIRRORED_REPEAT : 0x8370,
+/**
+ * @private
+ */
+var TextureWrap = {
+  CLAMP_TO_EDGE: WebGLConstants.CLAMP_TO_EDGE,
+  REPEAT: WebGLConstants.REPEAT,
+  MIRRORED_REPEAT: WebGLConstants.MIRRORED_REPEAT,
 
-        validate : function(textureWrap) {
-            return ((textureWrap === TextureWrap.CLAMP_TO_EDGE) ||
-                    (textureWrap === TextureWrap.REPEAT) ||
-                    (textureWrap === TextureWrap.MIRRORED_REPEAT));
-        }
-    };
-
-    return freezeObject(TextureWrap);
-});
+  validate: function (textureWrap) {
+    return (
+      textureWrap === TextureWrap.CLAMP_TO_EDGE ||
+      textureWrap === TextureWrap.REPEAT ||
+      textureWrap === TextureWrap.MIRRORED_REPEAT
+    );
+  },
+};
+export default Object.freeze(TextureWrap);

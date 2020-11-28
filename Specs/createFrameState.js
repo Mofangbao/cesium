@@ -1,42 +1,53 @@
-/*global define*/
-define([
-        'Core/defaultValue',
-        'Core/GeographicProjection',
-        'Core/JulianDate',
-        'Scene/Camera',
-        'Scene/CreditDisplay',
-        'Scene/FrameState'
-    ], function(
-        defaultValue,
-        GeographicProjection,
-        JulianDate,
-        Camera,
-        CreditDisplay,
-        FrameState) {
-    "use strict";
+import { defaultValue } from "../Source/Cesium.js";
+import { GeographicProjection } from "../Source/Cesium.js";
+import { JulianDate } from "../Source/Cesium.js";
+import { Camera } from "../Source/Cesium.js";
+import { CreditDisplay } from "../Source/Cesium.js";
+import { FrameState } from "../Source/Cesium.js";
+import { JobScheduler } from "../Source/Cesium.js";
 
-    var createFrameState = function(camera, frameNumber, time) {
-        // Mock frame-state for testing.
-        var frameState = new FrameState(new CreditDisplay(document.createElement('div')));
+function createFrameState(context, camera, frameNumber, time) {
+  // Mock frame-state for testing.
+  var frameState = new FrameState(
+    context,
+    new CreditDisplay(
+      document.createElement("div"),
+      undefined,
+      document.createElement("div")
+    ),
+    new JobScheduler()
+  );
 
-        var projection = new GeographicProjection();
-        frameState.mapProjection = projection;
-        frameState.frameNumber = defaultValue(frameNumber, 1.0);
-        frameState.time = defaultValue(time, JulianDate.fromDate(new Date('January 1, 2011 12:00:00 EST')));
+  var projection = new GeographicProjection();
+  frameState.mapProjection = projection;
+  frameState.frameNumber = defaultValue(frameNumber, 1.0);
+  frameState.time = defaultValue(
+    time,
+    JulianDate.fromDate(new Date("January 1, 2011 12:00:00 EST"))
+  );
 
-        camera = defaultValue(camera, new Camera({
-            drawingBufferWidth : 1,
-            drawingBufferHeight : 1,
-            mapProjection : projection
-        }));
-        frameState.camera = camera;
-        frameState.cullingVolume = camera.frustum.computeCullingVolume(camera.position, camera.direction, camera.up);
+  camera = defaultValue(
+    camera,
+    new Camera({
+      drawingBufferWidth: 1,
+      drawingBufferHeight: 1,
+      mapProjection: projection,
+    })
+  );
+  frameState.camera = camera;
+  frameState.cullingVolume = camera.frustum.computeCullingVolume(
+    camera.position,
+    camera.direction,
+    camera.up
+  );
 
-        frameState.passes.render = true;
-        frameState.passes.pick = false;
+  frameState.terrainExaggeration = 1.0;
 
-        return frameState;
-    };
+  frameState.passes.render = true;
+  frameState.passes.pick = false;
 
-    return createFrameState;
-});
+  frameState.minimumDisableDepthTestDistance = 0.0;
+
+  return frameState;
+}
+export default createFrameState;

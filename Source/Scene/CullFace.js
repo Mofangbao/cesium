@@ -1,41 +1,33 @@
-/*global define*/
-define([
-        '../Core/freezeObject'
-    ], function(
-        freezeObject) {
-    "use strict";
+import WebGLConstants from "../Core/WebGLConstants.js";
 
-    /**
-     * Determines which triangles, if any, are culled.
-     *
-     * @namespace
-     * @alias CullFace
-     */
-    var CullFace = {
-        /**
-         * 0x0404.  Front-facing triangles are culled.
-         *
-         * @type {Number}
-         * @constant
-         */
-        FRONT : 0x0404,
+/**
+ * Determines which triangles, if any, are culled.
+ *
+ * @enum {Number}
+ */
+var CullFace = {
+  /**
+   * Front-facing triangles are culled.
+   *
+   * @type {Number}
+   * @constant
+   */
+  FRONT: WebGLConstants.FRONT,
 
-        /**
-         * 0x405.  Back-facing triangles are culled.
-         *
-         * @type {Number}
-         * @constant
-         */
-        BACK : 0x0405,
+  /**
+   * Back-facing triangles are culled.
+   *
+   * @type {Number}
+   * @constant
+   */
+  BACK: WebGLConstants.BACK,
 
-        /**
-         * 0x0408.  Both face- and back-facing triangles are culled.
-         *
-         * @type {Number}
-         * @constant
-         */
-        FRONT_AND_BACK : 0x0408
-    };
-
-    return freezeObject(CullFace);
-});
+  /**
+   * Both front-facing and back-facing triangles are culled.
+   *
+   * @type {Number}
+   * @constant
+   */
+  FRONT_AND_BACK: WebGLConstants.FRONT_AND_BACK,
+};
+export default Object.freeze(CullFace);

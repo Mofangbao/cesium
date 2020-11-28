@@ -1,637 +1,430 @@
-/*global define*/
-define([
-        '../Core/Color',
-        '../Core/ColorGeometryInstanceAttribute',
-        '../Core/defaultValue',
-        '../Core/defined',
-        '../Core/defineProperties',
-        '../Core/destroyObject',
-        '../Core/DeveloperError',
-        '../Core/EllipseGeometry',
-        '../Core/EllipseOutlineGeometry',
-        '../Core/Event',
-        '../Core/GeometryInstance',
-        '../Core/Iso8601',
-        '../Core/ShowGeometryInstanceAttribute',
-        '../Scene/MaterialAppearance',
-        '../Scene/PerInstanceColorAppearance',
-        '../Scene/Primitive',
-        './ColorMaterialProperty',
-        './ConstantProperty',
-        './MaterialProperty',
-        './Property'
-    ], function(
-        Color,
-        ColorGeometryInstanceAttribute,
-        defaultValue,
-        defined,
-        defineProperties,
-        destroyObject,
-        DeveloperError,
-        EllipseGeometry,
-        EllipseOutlineGeometry,
-        Event,
-        GeometryInstance,
-        Iso8601,
-        ShowGeometryInstanceAttribute,
-        MaterialAppearance,
-        PerInstanceColorAppearance,
-        Primitive,
-        ColorMaterialProperty,
-        ConstantProperty,
-        MaterialProperty,
-        Property) {
-    "use strict";
+import ApproximateTerrainHeights from "../Core/ApproximateTerrainHeights.js";
+import Cartesian3 from "../Core/Cartesian3.js";
+import Check from "../Core/Check.js";
+import Color from "../Core/Color.js";
+import ColorGeometryInstanceAttribute from "../Core/ColorGeometryInstanceAttribute.js";
+import defined from "../Core/defined.js";
+import DeveloperError from "../Core/DeveloperError.js";
+import DistanceDisplayConditionGeometryInstanceAttribute from "../Core/DistanceDisplayConditionGeometryInstanceAttribute.js";
+import EllipseGeometry from "../Core/EllipseGeometry.js";
+import EllipseOutlineGeometry from "../Core/EllipseOutlineGeometry.js";
+import GeometryInstance from "../Core/GeometryInstance.js";
+import Iso8601 from "../Core/Iso8601.js";
+import OffsetGeometryInstanceAttribute from "../Core/OffsetGeometryInstanceAttribute.js";
+import Rectangle from "../Core/Rectangle.js";
+import ShowGeometryInstanceAttribute from "../Core/ShowGeometryInstanceAttribute.js";
+import HeightReference from "../Scene/HeightReference.js";
+import MaterialAppearance from "../Scene/MaterialAppearance.js";
+import PerInstanceColorAppearance from "../Scene/PerInstanceColorAppearance.js";
+import ColorMaterialProperty from "./ColorMaterialProperty.js";
+import DynamicGeometryUpdater from "./DynamicGeometryUpdater.js";
+import GeometryUpdater from "./GeometryUpdater.js";
+import GroundGeometryUpdater from "./GroundGeometryUpdater.js";
+import Property from "./Property.js";
 
-    var defaultMaterial = ColorMaterialProperty.fromColor(Color.WHITE);
-    var defaultShow = new ConstantProperty(true);
-    var defaultFill = new ConstantProperty(true);
-    var defaultOutline = new ConstantProperty(false);
-    var defaultOutlineColor = new ConstantProperty(Color.BLACK);
+var scratchColor = new Color();
+var defaultOffset = Cartesian3.ZERO;
+var offsetScratch = new Cartesian3();
+var scratchRectangle = new Rectangle();
 
-    var GeometryOptions = function(entity) {
-        this.id = entity;
-        this.vertexFormat = undefined;
-        this.center = undefined;
-        this.semiMajorAxis = undefined;
-        this.semiMinorAxis = undefined;
-        this.rotation = undefined;
-        this.height = undefined;
-        this.extrudedHeight = undefined;
-        this.granularity = undefined;
-        this.stRotation = undefined;
-        this.numberOfVerticalLines = undefined;
-    };
+function EllipseGeometryOptions(entity) {
+  this.id = entity;
+  this.vertexFormat = undefined;
+  this.center = undefined;
+  this.semiMajorAxis = undefined;
+  this.semiMinorAxis = undefined;
+  this.rotation = undefined;
+  this.height = undefined;
+  this.extrudedHeight = undefined;
+  this.granularity = undefined;
+  this.stRotation = undefined;
+  this.numberOfVerticalLines = undefined;
+  this.offsetAttribute = undefined;
+}
 
-    /**
-     * A {@link GeometryUpdater} for ellipses.
-     * Clients do not normally create this class directly, but instead rely on {@link DataSourceDisplay}.
-     * @alias EllipseGeometryUpdater
-     * @constructor
-     *
-     * @param {Entity} entity The entity containing the geometry to be visualized.
-     * @param {Scene} scene The scene where visualization is taking place.
-     */
-    var EllipseGeometryUpdater = function(entity, scene) {
-        //>>includeStart('debug', pragmas.debug);
-        if (!defined(entity)) {
-            throw new DeveloperError('entity is required');
-        }
-        if (!defined(scene)) {
-            throw new DeveloperError('scene is required');
-        }
-        //>>includeEnd('debug');
+/**
+ * A {@link GeometryUpdater} for ellipses.
+ * Clients do not normally create this class directly, but instead rely on {@link DataSourceDisplay}.
+ * @alias EllipseGeometryUpdater
+ * @constructor
+ *
+ * @param {Entity} entity The entity containing the geometry to be visualized.
+ * @param {Scene} scene The scene where visualization is taking place.
+ */
+function EllipseGeometryUpdater(entity, scene) {
+  GroundGeometryUpdater.call(this, {
+    entity: entity,
+    scene: scene,
+    geometryOptions: new EllipseGeometryOptions(entity),
+    geometryPropertyName: "ellipse",
+    observedPropertyNames: ["availability", "position", "ellipse"],
+  });
 
-        this._entity = entity;
-        this._scene = scene;
-        this._entitySubscription = entity.definitionChanged.addEventListener(EllipseGeometryUpdater.prototype._onEntityPropertyChanged, this);
-        this._fillEnabled = false;
-        this._isClosed = false;
-        this._dynamic = false;
-        this._outlineEnabled = false;
-        this._geometryChanged = new Event();
-        this._showProperty = undefined;
-        this._materialProperty = undefined;
-        this._hasConstantOutline = true;
-        this._showOutlineProperty = undefined;
-        this._outlineColorProperty = undefined;
-        this._outlineWidth = 1.0;
-        this._options = new GeometryOptions(entity);
-        this._onEntityPropertyChanged(entity, 'ellipse', entity.ellipse, undefined);
-    };
+  this._onEntityPropertyChanged(entity, "ellipse", entity.ellipse, undefined);
+}
 
-    defineProperties(EllipseGeometryUpdater, {
-        /**
-         * Gets the type of Appearance to use for simple color-based geometry.
-         * @memberof EllipseGeometryUpdater
-         * @type {Appearance}
-         */
-        perInstanceColorAppearanceType : {
-            value : PerInstanceColorAppearance
-        },
-        /**
-         * Gets the type of Appearance to use for material-based geometry.
-         * @memberof EllipseGeometryUpdater
-         * @type {Appearance}
-         */
-        materialAppearanceType : {
-            value : MaterialAppearance
-        }
-    });
+if (defined(Object.create)) {
+  EllipseGeometryUpdater.prototype = Object.create(
+    GroundGeometryUpdater.prototype
+  );
+  EllipseGeometryUpdater.prototype.constructor = EllipseGeometryUpdater;
+}
 
-    defineProperties(EllipseGeometryUpdater.prototype, {
-        /**
-         * Gets the entity associated with this geometry.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Entity}
-         * @readonly
-         */
-        entity : {
-            get : function() {
-                return this._entity;
-            }
-        },
-        /**
-         * Gets a value indicating if the geometry has a fill component.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        fillEnabled : {
-            get : function() {
-                return this._fillEnabled;
-            }
-        },
-        /**
-         * Gets a value indicating if fill visibility varies with simulation time.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        hasConstantFill : {
-            get : function() {
-                return !this._fillEnabled ||
-                       (!defined(this._entity.availability) &&
-                        Property.isConstant(this._showProperty) &&
-                        Property.isConstant(this._fillProperty));
-            }
-        },
-        /**
-         * Gets the material property used to fill the geometry.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {MaterialProperty}
-         * @readonly
-         */
-        fillMaterialProperty : {
-            get : function() {
-                return this._materialProperty;
-            }
-        },
-        /**
-         * Gets a value indicating if the geometry has an outline component.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        outlineEnabled : {
-            get : function() {
-                return this._outlineEnabled;
-            }
-        },
-        /**
-         * Gets a value indicating if outline visibility varies with simulation time.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        hasConstantOutline : {
-            get : function() {
-                return !this._outlineEnabled ||
-                       (!defined(this._entity.availability) &&
-                        Property.isConstant(this._showProperty) &&
-                        Property.isConstant(this._showOutlineProperty));
-            }
-        },
-        /**
-         * Gets the {@link Color} property for the geometry outline.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Property}
-         * @readonly
-         */
-        outlineColorProperty : {
-            get : function() {
-                return this._outlineColorProperty;
-            }
-        },
-        /**
-         * Gets the constant with of the geometry outline, in pixels.
-         * This value is only valid if isDynamic is false.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Number}
-         * @readonly
-         */
-        outlineWidth : {
-            get : function() {
-                return this._outlineWidth;
-            }
-        },
-        /**
-         * Gets a value indicating if the geometry is time-varying.
-         * If true, all visualization is delegated to the {@link DynamicGeometryUpdater}
-         * returned by GeometryUpdater#createDynamicUpdater.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        isDynamic : {
-            get : function() {
-                return this._dynamic;
-            }
-        },
-        /**
-         * Gets a value indicating if the geometry is closed.
-         * This property is only valid for static geometry.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        isClosed : {
-            get : function() {
-                return this._isClosed;
-            }
-        },
-        /**
-         * Gets an event that is raised whenever the public properties
-         * of this updater change.
-         * @memberof EllipseGeometryUpdater.prototype
-         *
-         * @type {Boolean}
-         * @readonly
-         */
-        geometryChanged : {
-            get : function() {
-                return this._geometryChanged;
-            }
-        }
-    });
+/**
+ * Creates the geometry instance which represents the fill of the geometry.
+ *
+ * @param {JulianDate} time The time to use when retrieving initial attribute values.
+ * @returns {GeometryInstance} The geometry instance representing the filled portion of the geometry.
+ *
+ * @exception {DeveloperError} This instance does not represent a filled geometry.
+ */
+EllipseGeometryUpdater.prototype.createFillGeometryInstance = function (time) {
+  //>>includeStart('debug', pragmas.debug);
+  Check.defined("time", time);
 
-    /**
-     * Checks if the geometry is outlined at the provided time.
-     *
-     * @param {JulianDate} time The time for which to retrieve visibility.
-     * @returns {Boolean} true if geometry is outlined at the provided time, false otherwise.
-     */
-    EllipseGeometryUpdater.prototype.isOutlineVisible = function(time) {
-        var entity = this._entity;
-        return this._outlineEnabled && entity.isAvailable(time) && this._showProperty.getValue(time) && this._showOutlineProperty.getValue(time);
-    };
+  if (!this._fillEnabled) {
+    throw new DeveloperError(
+      "This instance does not represent a filled geometry."
+    );
+  }
+  //>>includeEnd('debug');
 
-    /**
-     * Checks if the geometry is filled at the provided time.
-     *
-     * @param {JulianDate} time The time for which to retrieve visibility.
-     * @returns {Boolean} true if geometry is filled at the provided time, false otherwise.
-     */
-    EllipseGeometryUpdater.prototype.isFilled = function(time) {
-        var entity = this._entity;
-        return this._fillEnabled && entity.isAvailable(time) && this._showProperty.getValue(time) && this._fillProperty.getValue(time);
-    };
+  var entity = this._entity;
+  var isAvailable = entity.isAvailable(time);
 
-    /**
-     * Creates the geometry instance which represents the fill of the geometry.
-     *
-     * @param {JulianDate} time The time to use when retrieving initial attribute values.
-     * @returns {GeometryInstance} The geometry instance representing the filled portion of the geometry.
-     *
-     * @exception {DeveloperError} This instance does not represent a filled geometry.
-     */
-    EllipseGeometryUpdater.prototype.createFillGeometryInstance = function(time) {
-        //>>includeStart('debug', pragmas.debug);
-        if (!defined(time)) {
-            throw new DeveloperError('time is required.');
-        }
+  var attributes = {
+    show: new ShowGeometryInstanceAttribute(
+      isAvailable &&
+        entity.isShowing &&
+        this._showProperty.getValue(time) &&
+        this._fillProperty.getValue(time)
+    ),
+    distanceDisplayCondition: DistanceDisplayConditionGeometryInstanceAttribute.fromDistanceDisplayCondition(
+      this._distanceDisplayConditionProperty.getValue(time)
+    ),
+    offset: undefined,
+    color: undefined,
+  };
 
-        if (!this._fillEnabled) {
-            throw new DeveloperError('This instance does not represent a filled geometry.');
-        }
-        //>>includeEnd('debug');
+  if (this._materialProperty instanceof ColorMaterialProperty) {
+    var currentColor;
+    if (
+      defined(this._materialProperty.color) &&
+      (this._materialProperty.color.isConstant || isAvailable)
+    ) {
+      currentColor = this._materialProperty.color.getValue(time, scratchColor);
+    }
+    if (!defined(currentColor)) {
+      currentColor = Color.WHITE;
+    }
+    attributes.color = ColorGeometryInstanceAttribute.fromColor(currentColor);
+  }
 
-        var entity = this._entity;
-        var isAvailable = entity.isAvailable(time);
+  if (defined(this._options.offsetAttribute)) {
+    attributes.offset = OffsetGeometryInstanceAttribute.fromCartesian3(
+      Property.getValueOrDefault(
+        this._terrainOffsetProperty,
+        time,
+        defaultOffset,
+        offsetScratch
+      )
+    );
+  }
 
-        var attributes;
+  return new GeometryInstance({
+    id: entity,
+    geometry: new EllipseGeometry(this._options),
+    attributes: attributes,
+  });
+};
 
-        var color;
-        var show = new ShowGeometryInstanceAttribute(isAvailable && this._showProperty.getValue(time) && this._fillProperty.getValue(time));
-        if (this._materialProperty instanceof ColorMaterialProperty) {
-            var currentColor = Color.WHITE;
-            if (defined(this._materialProperty.color) && (this._materialProperty.color.isConstant || isAvailable)) {
-                currentColor = this._materialProperty.color.getValue(time);
-            }
-            color = ColorGeometryInstanceAttribute.fromColor(currentColor);
-            attributes = {
-                show : show,
-                color : color
-            };
-        } else {
-            attributes = {
-                show : show
-            };
-        }
+/**
+ * Creates the geometry instance which represents the outline of the geometry.
+ *
+ * @param {JulianDate} time The time to use when retrieving initial attribute values.
+ * @returns {GeometryInstance} The geometry instance representing the outline portion of the geometry.
+ *
+ * @exception {DeveloperError} This instance does not represent an outlined geometry.
+ */
+EllipseGeometryUpdater.prototype.createOutlineGeometryInstance = function (
+  time
+) {
+  //>>includeStart('debug', pragmas.debug);
+  Check.defined("time", time);
 
-        return new GeometryInstance({
-            id : entity,
-            geometry : new EllipseGeometry(this._options),
-            attributes : attributes
-        });
-    };
+  if (!this._outlineEnabled) {
+    throw new DeveloperError(
+      "This instance does not represent an outlined geometry."
+    );
+  }
+  //>>includeEnd('debug');
 
-    /**
-     * Creates the geometry instance which represents the outline of the geometry.
-     *
-     * @param {JulianDate} time The time to use when retrieving initial attribute values.
-     * @returns {GeometryInstance} The geometry instance representing the outline portion of the geometry.
-     *
-     * @exception {DeveloperError} This instance does not represent an outlined geometry.
-     */
-    EllipseGeometryUpdater.prototype.createOutlineGeometryInstance = function(time) {
-        //>>includeStart('debug', pragmas.debug);
-        if (!defined(time)) {
-            throw new DeveloperError('time is required.');
-        }
+  var entity = this._entity;
+  var isAvailable = entity.isAvailable(time);
+  var outlineColor = Property.getValueOrDefault(
+    this._outlineColorProperty,
+    time,
+    Color.BLACK,
+    scratchColor
+  );
+  var distanceDisplayCondition = this._distanceDisplayConditionProperty.getValue(
+    time
+  );
 
-        if (!this._outlineEnabled) {
-            throw new DeveloperError('This instance does not represent an outlined geometry.');
-        }
-        //>>includeEnd('debug');
+  var attributes = {
+    show: new ShowGeometryInstanceAttribute(
+      isAvailable &&
+        entity.isShowing &&
+        this._showProperty.getValue(time) &&
+        this._showOutlineProperty.getValue(time)
+    ),
+    color: ColorGeometryInstanceAttribute.fromColor(outlineColor),
+    distanceDisplayCondition: DistanceDisplayConditionGeometryInstanceAttribute.fromDistanceDisplayCondition(
+      distanceDisplayCondition
+    ),
+    offset: undefined,
+  };
 
-        var entity = this._entity;
-        var isAvailable = entity.isAvailable(time);
-        var outlineColor = Property.getValueOrDefault(this._outlineColorProperty, time, Color.BLACK);
+  if (defined(this._options.offsetAttribute)) {
+    attributes.offset = OffsetGeometryInstanceAttribute.fromCartesian3(
+      Property.getValueOrDefault(
+        this._terrainOffsetProperty,
+        time,
+        defaultOffset,
+        offsetScratch
+      )
+    );
+  }
 
-        return new GeometryInstance({
-            id : entity,
-            geometry : new EllipseOutlineGeometry(this._options),
-            attributes : {
-                show : new ShowGeometryInstanceAttribute(isAvailable && this._showProperty.getValue(time) && this._showOutlineProperty.getValue(time)),
-                color : ColorGeometryInstanceAttribute.fromColor(outlineColor)
-            }
-        });
-    };
+  return new GeometryInstance({
+    id: entity,
+    geometry: new EllipseOutlineGeometry(this._options),
+    attributes: attributes,
+  });
+};
 
-    /**
-     * Returns true if this object was destroyed; otherwise, false.
-     *
-     * @returns {Boolean} True if this object was destroyed; otherwise, false.
-     */
-    EllipseGeometryUpdater.prototype.isDestroyed = function() {
-        return false;
-    };
+EllipseGeometryUpdater.prototype._computeCenter = function (time, result) {
+  return Property.getValueOrUndefined(this._entity.position, time, result);
+};
 
-    /**
-     * Destroys and resources used by the object.  Once an object is destroyed, it should not be used.
-     *
-     * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
-     */
-    EllipseGeometryUpdater.prototype.destroy = function() {
-        this._entitySubscription();
-        destroyObject(this);
-    };
+EllipseGeometryUpdater.prototype._isHidden = function (entity, ellipse) {
+  var position = entity.position;
 
-    EllipseGeometryUpdater.prototype._onEntityPropertyChanged = function(entity, propertyName, newValue, oldValue) {
-        if (!(propertyName === 'availability' || propertyName === 'position' || propertyName === 'ellipse')) {
-            return;
-        }
+  return (
+    !defined(position) ||
+    !defined(ellipse.semiMajorAxis) ||
+    !defined(ellipse.semiMinorAxis) ||
+    GeometryUpdater.prototype._isHidden.call(this, entity, ellipse)
+  );
+};
 
-        var ellipse = this._entity.ellipse;
+EllipseGeometryUpdater.prototype._isDynamic = function (entity, ellipse) {
+  return (
+    !entity.position.isConstant || //
+    !ellipse.semiMajorAxis.isConstant || //
+    !ellipse.semiMinorAxis.isConstant || //
+    !Property.isConstant(ellipse.rotation) || //
+    !Property.isConstant(ellipse.height) || //
+    !Property.isConstant(ellipse.extrudedHeight) || //
+    !Property.isConstant(ellipse.granularity) || //
+    !Property.isConstant(ellipse.stRotation) || //
+    !Property.isConstant(ellipse.outlineWidth) || //
+    !Property.isConstant(ellipse.numberOfVerticalLines) || //
+    !Property.isConstant(ellipse.zIndex) || //
+    (this._onTerrain &&
+      !Property.isConstant(this._materialProperty) &&
+      !(this._materialProperty instanceof ColorMaterialProperty))
+  );
+};
 
-        if (!defined(ellipse)) {
-            if (this._fillEnabled || this._outlineEnabled) {
-                this._fillEnabled = false;
-                this._outlineEnabled = false;
-                this._geometryChanged.raiseEvent(this);
-            }
-            return;
-        }
+EllipseGeometryUpdater.prototype._setStaticOptions = function (
+  entity,
+  ellipse
+) {
+  var heightValue = Property.getValueOrUndefined(
+    ellipse.height,
+    Iso8601.MINIMUM_VALUE
+  );
+  var heightReferenceValue = Property.getValueOrDefault(
+    ellipse.heightReference,
+    Iso8601.MINIMUM_VALUE,
+    HeightReference.NONE
+  );
+  var extrudedHeightValue = Property.getValueOrUndefined(
+    ellipse.extrudedHeight,
+    Iso8601.MINIMUM_VALUE
+  );
+  var extrudedHeightReferenceValue = Property.getValueOrDefault(
+    ellipse.extrudedHeightReference,
+    Iso8601.MINIMUM_VALUE,
+    HeightReference.NONE
+  );
+  if (defined(extrudedHeightValue) && !defined(heightValue)) {
+    heightValue = 0;
+  }
 
-        var fillProperty = ellipse.fill;
-        var fillEnabled = defined(fillProperty) && fillProperty.isConstant ? fillProperty.getValue(Iso8601.MINIMUM_VALUE) : true;
+  var options = this._options;
+  options.vertexFormat =
+    this._materialProperty instanceof ColorMaterialProperty
+      ? PerInstanceColorAppearance.VERTEX_FORMAT
+      : MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat;
+  options.center = entity.position.getValue(
+    Iso8601.MINIMUM_VALUE,
+    options.center
+  );
+  options.semiMajorAxis = ellipse.semiMajorAxis.getValue(
+    Iso8601.MINIMUM_VALUE,
+    options.semiMajorAxis
+  );
+  options.semiMinorAxis = ellipse.semiMinorAxis.getValue(
+    Iso8601.MINIMUM_VALUE,
+    options.semiMinorAxis
+  );
+  options.rotation = Property.getValueOrUndefined(
+    ellipse.rotation,
+    Iso8601.MINIMUM_VALUE
+  );
+  options.granularity = Property.getValueOrUndefined(
+    ellipse.granularity,
+    Iso8601.MINIMUM_VALUE
+  );
+  options.stRotation = Property.getValueOrUndefined(
+    ellipse.stRotation,
+    Iso8601.MINIMUM_VALUE
+  );
+  options.numberOfVerticalLines = Property.getValueOrUndefined(
+    ellipse.numberOfVerticalLines,
+    Iso8601.MINIMUM_VALUE
+  );
+  options.offsetAttribute = GroundGeometryUpdater.computeGeometryOffsetAttribute(
+    heightValue,
+    heightReferenceValue,
+    extrudedHeightValue,
+    extrudedHeightReferenceValue
+  );
+  options.height = GroundGeometryUpdater.getGeometryHeight(
+    heightValue,
+    heightReferenceValue
+  );
 
-        var outlineProperty = ellipse.outline;
-        var outlineEnabled = defined(outlineProperty);
-        if (outlineEnabled && outlineProperty.isConstant) {
-            outlineEnabled = outlineProperty.getValue(Iso8601.MINIMUM_VALUE);
-        }
+  extrudedHeightValue = GroundGeometryUpdater.getGeometryExtrudedHeight(
+    extrudedHeightValue,
+    extrudedHeightReferenceValue
+  );
+  if (extrudedHeightValue === GroundGeometryUpdater.CLAMP_TO_GROUND) {
+    extrudedHeightValue = ApproximateTerrainHeights.getMinimumMaximumHeights(
+      EllipseGeometry.computeRectangle(options, scratchRectangle)
+    ).minimumTerrainHeight;
+  }
 
-        if (!fillEnabled && !outlineEnabled) {
-            if (this._fillEnabled || this._outlineEnabled) {
-                this._fillEnabled = false;
-                this._outlineEnabled = false;
-                this._geometryChanged.raiseEvent(this);
-            }
-            return;
-        }
+  options.extrudedHeight = extrudedHeightValue;
+};
 
-        var position = this._entity.position;
-        var semiMajorAxis = ellipse.semiMajorAxis;
-        var semiMinorAxis = ellipse.semiMinorAxis;
+EllipseGeometryUpdater.DynamicGeometryUpdater = DynamicEllipseGeometryUpdater;
 
-        var show = ellipse.show;
-        if ((defined(show) && show.isConstant && !show.getValue(Iso8601.MINIMUM_VALUE)) || //
-            (!defined(position) || !defined(semiMajorAxis) || !defined(semiMinorAxis))) {
-            if (this._fillEnabled || this._outlineEnabled) {
-                this._fillEnabled = false;
-                this._outlineEnabled = false;
-                this._geometryChanged.raiseEvent(this);
-            }
-            return;
-        }
+/**
+ * @private
+ */
+function DynamicEllipseGeometryUpdater(
+  geometryUpdater,
+  primitives,
+  groundPrimitives
+) {
+  DynamicGeometryUpdater.call(
+    this,
+    geometryUpdater,
+    primitives,
+    groundPrimitives
+  );
+}
 
-        var material = defaultValue(ellipse.material, defaultMaterial);
-        var isColorMaterial = material instanceof ColorMaterialProperty;
-        this._materialProperty = material;
-        this._fillProperty = defaultValue(fillProperty, defaultFill);
-        this._showProperty = defaultValue(show, defaultShow);
-        this._showOutlineProperty = defaultValue(ellipse.outline, defaultOutline);
-        this._outlineColorProperty = outlineEnabled ? defaultValue(ellipse.outlineColor, defaultOutlineColor) : undefined;
+if (defined(Object.create)) {
+  DynamicEllipseGeometryUpdater.prototype = Object.create(
+    DynamicGeometryUpdater.prototype
+  );
+  DynamicEllipseGeometryUpdater.prototype.constructor = DynamicEllipseGeometryUpdater;
+}
 
-        var rotation = ellipse.rotation;
-        var height = ellipse.height;
-        var extrudedHeight = ellipse.extrudedHeight;
-        var granularity = ellipse.granularity;
-        var stRotation = ellipse.stRotation;
-        var outlineWidth = ellipse.outlineWidth;
-        var numberOfVerticalLines = ellipse.numberOfVerticalLines;
+DynamicEllipseGeometryUpdater.prototype._isHidden = function (
+  entity,
+  ellipse,
+  time
+) {
+  var options = this._options;
+  return (
+    !defined(options.center) ||
+    !defined(options.semiMajorAxis) ||
+    !defined(options.semiMinorAxis) ||
+    DynamicGeometryUpdater.prototype._isHidden.call(this, entity, ellipse, time)
+  );
+};
 
-        this._isClosed = defined(extrudedHeight);
-        this._fillEnabled = fillEnabled;
-        this._outlineEnabled = outlineEnabled;
+DynamicEllipseGeometryUpdater.prototype._setOptions = function (
+  entity,
+  ellipse,
+  time
+) {
+  var options = this._options;
+  var heightValue = Property.getValueOrUndefined(ellipse.height, time);
+  var heightReferenceValue = Property.getValueOrDefault(
+    ellipse.heightReference,
+    time,
+    HeightReference.NONE
+  );
+  var extrudedHeightValue = Property.getValueOrUndefined(
+    ellipse.extrudedHeight,
+    time
+  );
+  var extrudedHeightReferenceValue = Property.getValueOrDefault(
+    ellipse.extrudedHeightReference,
+    time,
+    HeightReference.NONE
+  );
+  if (defined(extrudedHeightValue) && !defined(heightValue)) {
+    heightValue = 0;
+  }
 
-        if (!position.isConstant || //
-            !semiMajorAxis.isConstant || //
-            !semiMinorAxis.isConstant || //
-            !Property.isConstant(rotation) || //
-            !Property.isConstant(height) || //
-            !Property.isConstant(extrudedHeight) || //
-            !Property.isConstant(granularity) || //
-            !Property.isConstant(stRotation) || //
-            !Property.isConstant(outlineWidth) || //
-            !Property.isConstant(numberOfVerticalLines)) {
-            if (!this._dynamic) {
-                this._dynamic = true;
-                this._geometryChanged.raiseEvent(this);
-            }
-        } else {
-            var options = this._options;
-            options.vertexFormat = isColorMaterial ? PerInstanceColorAppearance.VERTEX_FORMAT : MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat;
-            options.center = position.getValue(Iso8601.MINIMUM_VALUE, options.center);
-            options.semiMajorAxis = semiMajorAxis.getValue(Iso8601.MINIMUM_VALUE, options.semiMajorAxis);
-            options.semiMinorAxis = semiMinorAxis.getValue(Iso8601.MINIMUM_VALUE, options.semiMinorAxis);
-            options.rotation = defined(rotation) ? rotation.getValue(Iso8601.MINIMUM_VALUE) : undefined;
-            options.height = defined(height) ? height.getValue(Iso8601.MINIMUM_VALUE) : undefined;
-            options.extrudedHeight = defined(extrudedHeight) ? extrudedHeight.getValue(Iso8601.MINIMUM_VALUE) : undefined;
-            options.granularity = defined(granularity) ? granularity.getValue(Iso8601.MINIMUM_VALUE) : undefined;
-            options.stRotation = defined(stRotation) ? stRotation.getValue(Iso8601.MINIMUM_VALUE) : undefined;
-            options.numberOfVerticalLines = defined(numberOfVerticalLines) ? numberOfVerticalLines.getValue(Iso8601.MINIMUM_VALUE) : undefined;
-            this._outlineWidth = defined(outlineWidth) ? outlineWidth.getValue(Iso8601.MINIMUM_VALUE) : 1.0;
-            this._dynamic = false;
-            this._geometryChanged.raiseEvent(this);
-        }
-    };
+  options.center = Property.getValueOrUndefined(
+    entity.position,
+    time,
+    options.center
+  );
+  options.semiMajorAxis = Property.getValueOrUndefined(
+    ellipse.semiMajorAxis,
+    time
+  );
+  options.semiMinorAxis = Property.getValueOrUndefined(
+    ellipse.semiMinorAxis,
+    time
+  );
+  options.rotation = Property.getValueOrUndefined(ellipse.rotation, time);
+  options.granularity = Property.getValueOrUndefined(ellipse.granularity, time);
+  options.stRotation = Property.getValueOrUndefined(ellipse.stRotation, time);
+  options.numberOfVerticalLines = Property.getValueOrUndefined(
+    ellipse.numberOfVerticalLines,
+    time
+  );
+  options.offsetAttribute = GroundGeometryUpdater.computeGeometryOffsetAttribute(
+    heightValue,
+    heightReferenceValue,
+    extrudedHeightValue,
+    extrudedHeightReferenceValue
+  );
+  options.height = GroundGeometryUpdater.getGeometryHeight(
+    heightValue,
+    heightReferenceValue
+  );
 
-    /**
-     * Creates the dynamic updater to be used when GeometryUpdater#isDynamic is true.
-     *
-     * @param {PrimitiveCollection} primitives The primitive collection to use.
-     * @returns {DynamicGeometryUpdater} The dynamic updater used to update the geometry each frame.
-     *
-     * @exception {DeveloperError} This instance does not represent dynamic geometry.
-     */
-    EllipseGeometryUpdater.prototype.createDynamicUpdater = function(primitives) {
-        //>>includeStart('debug', pragmas.debug);
-        if (!this._dynamic) {
-            throw new DeveloperError('This instance does not represent dynamic geometry.');
-        }
+  extrudedHeightValue = GroundGeometryUpdater.getGeometryExtrudedHeight(
+    extrudedHeightValue,
+    extrudedHeightReferenceValue
+  );
+  if (extrudedHeightValue === GroundGeometryUpdater.CLAMP_TO_GROUND) {
+    extrudedHeightValue = ApproximateTerrainHeights.getMinimumMaximumHeights(
+      EllipseGeometry.computeRectangle(options, scratchRectangle)
+    ).minimumTerrainHeight;
+  }
 
-        if (!defined(primitives)) {
-            throw new DeveloperError('primitives is required.');
-        }
-        //>>includeEnd('debug');
-
-        return new DynamicGeometryUpdater(primitives, this);
-    };
-
-    /**
-     * @private
-     */
-    var DynamicGeometryUpdater = function(primitives, geometryUpdater) {
-        this._primitives = primitives;
-        this._primitive = undefined;
-        this._outlinePrimitive = undefined;
-        this._geometryUpdater = geometryUpdater;
-        this._options = new GeometryOptions(geometryUpdater._entity);
-    };
-
-    DynamicGeometryUpdater.prototype.update = function(time) {
-        //>>includeStart('debug', pragmas.debug);
-        if (!defined(time)) {
-            throw new DeveloperError('time is required.');
-        }
-        //>>includeEnd('debug');
-
-        var geometryUpdater = this._geometryUpdater;
-
-        if (defined(this._primitive)) {
-            this._primitives.remove(this._primitive);
-        }
-
-        if (defined(this._outlinePrimitive)) {
-            this._primitives.remove(this._outlinePrimitive);
-        }
-
-        var entity = geometryUpdater._entity;
-        var ellipse = entity.ellipse;
-        var show = ellipse.show;
-
-        if (!entity.isAvailable(time) || (defined(show) && !show.getValue(time))) {
-            return;
-        }
-
-        var options = this._options;
-
-        var position = entity.position;
-        var semiMajorAxis = ellipse.semiMajorAxis;
-        var semiMinorAxis = ellipse.semiMinorAxis;
-        var rotation = ellipse.rotation;
-        var height = ellipse.height;
-        var extrudedHeight = ellipse.extrudedHeight;
-        var granularity = ellipse.granularity;
-        var stRotation = ellipse.stRotation;
-        var numberOfVerticalLines = ellipse.numberOfVerticalLines;
-
-        options.center = position.getValue(time, options.center);
-        options.semiMajorAxis = semiMajorAxis.getValue(time, options.semiMajorAxis);
-        options.semiMinorAxis = semiMinorAxis.getValue(time, options.semiMinorAxis);
-        options.rotation = defined(rotation) ? rotation.getValue(time, options) : undefined;
-        options.height = defined(height) ? height.getValue(time, options) : undefined;
-        options.extrudedHeight = defined(extrudedHeight) ? extrudedHeight.getValue(time, options) : undefined;
-        options.granularity = defined(granularity) ? granularity.getValue(time) : undefined;
-        options.stRotation = defined(stRotation) ? stRotation.getValue(time) : undefined;
-
-        if (!defined(ellipse.fill) || ellipse.fill.getValue(time)) {
-            this._material = MaterialProperty.getValue(time, geometryUpdater.fillMaterialProperty, this._material);
-            var material = this._material;
-            var appearance = new MaterialAppearance({
-                material : material,
-                translucent : material.isTranslucent(),
-                closed : defined(options.extrudedHeight)
-            });
-            options.vertexFormat = appearance.vertexFormat;
-
-            this._primitive = new Primitive({
-                geometryInstances : new GeometryInstance({
-                    id : entity,
-                    geometry : new EllipseGeometry(options)
-                }),
-                appearance : appearance,
-                asynchronous : false
-            });
-            this._primitives.add(this._primitive);
-        }
-
-        if (defined(ellipse.outline) && ellipse.outline.getValue(time)) {
-            options.vertexFormat = PerInstanceColorAppearance.VERTEX_FORMAT;
-            options.numberOfVerticalLines = defined(numberOfVerticalLines) ? numberOfVerticalLines.getValue(time) : undefined;
-
-            var outlineColor = defined(ellipse.outlineColor) ? ellipse.outlineColor.getValue(time) : Color.BLACK;
-            var outlineWidth = defined(ellipse.outlineWidth) ? ellipse.outlineWidth.getValue(time) : 1.0;
-            var translucent = outlineColor.alpha !== 1.0;
-
-            this._outlinePrimitive = new Primitive({
-                geometryInstances : new GeometryInstance({
-                    id : entity,
-                    geometry : new EllipseOutlineGeometry(options),
-                    attributes : {
-                        color : ColorGeometryInstanceAttribute.fromColor(outlineColor)
-                    }
-                }),
-                appearance : new PerInstanceColorAppearance({
-                    flat : true,
-                    translucent : translucent,
-                    renderState : {
-                        lineWidth : geometryUpdater._scene.clampLineWidth(outlineWidth)
-                    }
-                }),
-                asynchronous : false
-            });
-            this._primitives.add(this._outlinePrimitive);
-        }
-    };
-
-    DynamicGeometryUpdater.prototype.isDestroyed = function() {
-        return false;
-    };
-
-    DynamicGeometryUpdater.prototype.destroy = function() {
-        if (defined(this._primitive)) {
-            this._primitives.remove(this._primitive);
-        }
-
-        if (defined(this._outlinePrimitive)) {
-            this._primitives.remove(this._outlinePrimitive);
-        }
-        destroyObject(this);
-    };
-
-    return EllipseGeometryUpdater;
-});
+  options.extrudedHeight = extrudedHeightValue;
+};
+export default EllipseGeometryUpdater;

@@ -1,81 +1,73 @@
-/*global define*/
-define([
-        '../Core/freezeObject'
-    ], function(
-        freezeObject) {
-    "use strict";
+import WebGLConstants from "../Core/WebGLConstants.js";
 
-    /**
-     * Determines the function used to compare two depths for the depth test.
-     *
-     * @namespace
-     * @alias DepthFunction
-     */
-    var DepthFunction = {
-        /**
-         * 0x200.  The depth test never passes.
-         *
-         * @type {Number}
-         * @constant
-         */
-        NEVER : 0x0200,
+/**
+ * Determines the function used to compare two depths for the depth test.
+ *
+ * @enum {Number}
+ */
+var DepthFunction = {
+  /**
+   * The depth test never passes.
+   *
+   * @type {Number}
+   * @constant
+   */
+  NEVER: WebGLConstants.NEVER,
 
-        /**
-         * 0x201.  The depth test passes if the incoming depth is less than the stored depth.
-         *
-         * @type {Number}
-         * @constant
-         */
-        LESS : 0x201,
+  /**
+   * The depth test passes if the incoming depth is less than the stored depth.
+   *
+   * @type {Number}
+   * @constant
+   */
+  LESS: WebGLConstants.LESS,
 
-        /**
-         * 0x202.  The depth test passes if the incoming depth is equal to the stored depth.
-         *
-         * @type {Number}
-         * @constant
-         */
-        EQUAL : 0x0202,
+  /**
+   * The depth test passes if the incoming depth is equal to the stored depth.
+   *
+   * @type {Number}
+   * @constant
+   */
+  EQUAL: WebGLConstants.EQUAL,
 
-        /**
-         * 0x203.  The depth test passes if the incoming depth is less than or equal to the stored depth.
-         *
-         * @type {Number}
-         * @constant
-         */
-        LESS_OR_EQUAL : 0x203, // LEQUAL
+  /**
+   * The depth test passes if the incoming depth is less than or equal to the stored depth.
+   *
+   * @type {Number}
+   * @constant
+   */
+  LESS_OR_EQUAL: WebGLConstants.LEQUAL,
 
-        /**
-         * 0x204.  The depth test passes if the incoming depth is greater than the stored depth.
-         *
-         * @type {Number}
-         * @constant
-         */
-        GREATER : 0x0204,
+  /**
+   * The depth test passes if the incoming depth is greater than the stored depth.
+   *
+   * @type {Number}
+   * @constant
+   */
+  GREATER: WebGLConstants.GREATER,
 
-        /**
-         * 0x0205.  The depth test passes if the incoming depth is not equal to the stored depth.
-         *
-         * @type {Number}
-         * @constant
-         */
-        NOT_EQUAL : 0x0205, // NOTEQUAL
+  /**
+   * The depth test passes if the incoming depth is not equal to the stored depth.
+   *
+   * @type {Number}
+   * @constant
+   */
+  NOT_EQUAL: WebGLConstants.NOTEQUAL,
 
-        /**
-         * 0x206.  The depth test passes if the incoming depth is greater than or equal to the stored depth.
-         *
-         * @type {Number}
-         * @constant
-         */
-        GREATER_OR_EQUAL : 0x0206, // GEQUAL
+  /**
+   * The depth test passes if the incoming depth is greater than or equal to the stored depth.
+   *
+   * @type {Number}
+   * @constant
+   */
+  GREATER_OR_EQUAL: WebGLConstants.GEQUAL,
 
-        /**
-         * 0x207.  The depth test always passes.
-         *
-         * @type {Number}
-         * @constant
-         */
-        ALWAYS : 0x0207
-    };
-
-    return freezeObject(DepthFunction);
-});
+  /**
+   * The depth test always passes.
+   *
+   * @type {Number}
+   * @constant
+   */
+  ALWAYS: WebGLConstants.ALWAYS,
+};
+export default Object.freeze(DepthFunction);

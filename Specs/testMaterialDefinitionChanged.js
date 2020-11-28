@@ -1,27 +1,29 @@
-/*global define*/
-define([
-        'DataSources/ColorMaterialProperty'
-    ], function(
-        ColorMaterialProperty) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+import { ColorMaterialProperty } from "../Source/Cesium.js";
 
-    function testMaterialDefinitionChanged(property, name, value1, value2) {
-        var listener = jasmine.createSpy('listener');
-        property.definitionChanged.addEventListener(listener);
+function testMaterialDefinitionChanged(property, name, value1, value2) {
+  var listener = jasmine.createSpy("listener");
+  property.definitionChanged.addEventListener(listener);
 
-        var oldValue = property[name];
-        property[name] = ColorMaterialProperty.fromColor(value1);
-        expect(listener).toHaveBeenCalledWith(property, name, property[name], oldValue);
-        listener.reset();
+  var oldValue = property[name];
+  property[name] = new ColorMaterialProperty(value1);
+  expect(listener).toHaveBeenCalledWith(
+    property,
+    name,
+    property[name],
+    oldValue
+  );
+  listener.calls.reset();
 
-        property[name].color.setValue(value2);
-        expect(listener).toHaveBeenCalledWith(property, name, property[name], property[name]);
-        listener.reset();
+  property[name].color.setValue(value2);
+  expect(listener).toHaveBeenCalledWith(
+    property,
+    name,
+    property[name],
+    property[name]
+  );
+  listener.calls.reset();
 
-        property[name] = property[name];
-        expect(listener.callCount).toEqual(0);
-    }
-
-    return testMaterialDefinitionChanged;
-});
+  property[name] = property[name];
+  expect(listener.calls.count()).toEqual(0);
+}
+export default testMaterialDefinitionChanged;

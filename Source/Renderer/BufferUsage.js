@@ -1,24 +1,19 @@
-/*global define*/
-define([
-        '../Core/freezeObject'
-    ], function(
-        freezeObject) {
-    "use strict";
+import WebGLConstants from "../Core/WebGLConstants.js";
 
-    /**
-     * @private
-     */
-    var BufferUsage = {
-        STREAM_DRAW : 0x88E0,
-        STATIC_DRAW : 0x88E4,
-        DYNAMIC_DRAW : 0x88E8,
+/**
+ * @private
+ */
+var BufferUsage = {
+  STREAM_DRAW: WebGLConstants.STREAM_DRAW,
+  STATIC_DRAW: WebGLConstants.STATIC_DRAW,
+  DYNAMIC_DRAW: WebGLConstants.DYNAMIC_DRAW,
 
-        validate : function(bufferUsage) {
-            return ((bufferUsage === BufferUsage.STREAM_DRAW) ||
-                    (bufferUsage === BufferUsage.STATIC_DRAW) ||
-                    (bufferUsage === BufferUsage.DYNAMIC_DRAW));
-        }
-    };
-
-    return freezeObject(BufferUsage);
-});
+  validate: function (bufferUsage) {
+    return (
+      bufferUsage === BufferUsage.STREAM_DRAW ||
+      bufferUsage === BufferUsage.STATIC_DRAW ||
+      bufferUsage === BufferUsage.DYNAMIC_DRAW
+    );
+  },
+};
+export default Object.freeze(BufferUsage);

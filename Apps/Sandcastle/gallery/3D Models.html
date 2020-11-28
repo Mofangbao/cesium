@@ -1,103 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">  <!-- Use Chrome Frame in IE -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
-    <meta name="description" content="Create 3D models using glTF.">
-    <meta name="cesium-sandcastle-labels" content="Tutorials,Showcases">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
+    />
+    <meta name="description" content="Create 3D models using glTF." />
+    <meta name="cesium-sandcastle-labels" content="Tutorials,Showcases" />
     <title>Cesium Demo</title>
     <script type="text/javascript" src="../Sandcastle-header.js"></script>
-    <script type="text/javascript" src="../../../ThirdParty/requirejs-2.1.9/require.js"></script>
-    <script type="text/javascript">
-    require.config({
-        baseUrl : '../../../Source',
-        waitSeconds : 60
-    });
-    </script>
-</head>
-<body class="sandcastle-loading" data-sandcastle-bucket="bucket-requirejs.html">
-<style>
-    @import url(../templates/bucket.css);
-</style>
-<div id="cesiumContainer" class="fullSize"></div>
-<div id="loadingOverlay"><h1>Loading...</h1></div>
-<div id="toolbar"></div>
-<script id="cesium_sandcastle_script">
-function startup(Cesium) {
-    "use strict";
-//Sandcastle_Begin
-var viewer = new Cesium.Viewer('cesiumContainer');
-var scene = viewer.scene;
-
-function createModel(url, height) {
-    height = Cesium.defaultValue(height, 0.0);
-
-    var modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(-123.0744619, 44.0503706, height));
-
-    scene.primitives.removeAll(); // Remove previous model
-    var model = scene.primitives.add(Cesium.Model.fromGltf({
-        url : url,
-        modelMatrix : modelMatrix,
-        minimumPixelSize : 128
-    }));
-
-    model.readyToRender.addEventListener(function(model) {
-        // Play and loop all animations at half-speed
-        model.activeAnimations.addAll({
-            speedup : 0.5,
-            loop : Cesium.ModelAnimationLoop.REPEAT
+    <script
+      type="text/javascript"
+      src="../../../Build/CesiumUnminified/Cesium.js"
+      nomodule
+    ></script>
+    <script type="module" src="../load-cesium-es6.js"></script>
+  </head>
+  <body
+    class="sandcastle-loading"
+    data-sandcastle-bucket="bucket-requirejs.html"
+  >
+    <style>
+      @import url(../templates/bucket.css);
+    </style>
+    <div id="cesiumContainer" class="fullSize"></div>
+    <div id="loadingOverlay"><h1>Loading...</h1></div>
+    <div id="toolbar"></div>
+    <script id="cesium_sandcastle_script">
+      function startup(Cesium) {
+        "use strict";
+        //Sandcastle_Begin
+        var viewer = new Cesium.Viewer("cesiumContainer", {
+          infoBox: false,
+          selectionIndicator: false,
+          shadows: true,
+          shouldAnimate: true,
         });
 
-        // Zoom to model
-        var center = Cesium.Matrix4.multiplyByPoint(model.modelMatrix, model.boundingSphere.center, new Cesium.Cartesian3());
-        var transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-        var camera = scene.camera;
-        camera.transform = transform;
-        var controller = scene.screenSpaceCameraController;
-        var r = 2.0 * Math.max(model.boundingSphere.radius, camera.frustum.near);
-        controller.minimumZoomDistance = r * 0.5;
-        camera.lookAt(new Cesium.Cartesian3(r, r, r), Cesium.Cartesian3.ZERO, Cesium.Cartesian3.UNIT_Z);
-    });
-}
+        function createModel(url, height) {
+          viewer.entities.removeAll();
 
-var handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
-handler.setInputAction(function(movement) {
-    var pick = scene.pick(movement.endPosition);
-    if (Cesium.defined(pick) && Cesium.defined(pick.node) && Cesium.defined(pick.mesh)) {
-        // Output glTF node and mesh under the mouse. 
-        console.log('node: ' + pick.node.name + '. mesh: ' + pick.mesh.name);
-    }
-}, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+          var position = Cesium.Cartesian3.fromDegrees(
+            -123.0744619,
+            44.0503706,
+            height
+          );
+          var heading = Cesium.Math.toRadians(135);
+          var pitch = 0;
+          var roll = 0;
+          var hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+          var orientation = Cesium.Transforms.headingPitchRollQuaternion(
+            position,
+            hpr
+          );
 
-///////////////////////////////////////////////////////////////////////////
+          var entity = viewer.entities.add({
+            name: url,
+            position: position,
+            orientation: orientation,
+            model: {
+              uri: url,
+              minimumPixelSize: 128,
+              maximumScale: 20000,
+            },
+          });
+          viewer.trackedEntity = entity;
+        }
 
-var options = [{
-text : 'Aircraft',
-onselect : function() {
-    createModel('../../SampleData/models/CesiumAir/Cesium_Air.gltf', 5000.0);
-    }
-}, {
-text : 'Ground vehicle',
-    onselect : function() {
-        createModel('../../SampleData/models/CesiumGround/Cesium_Ground.gltf');
-    }
-}, {
-    text : 'Skinned character',
-    onselect : function() {
-        createModel('../../SampleData/models/CesiumMan/Cesium_Man.gltf');
-    }
-}];
+        var options = [
+          {
+            text: "Aircraft",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/CesiumAir/Cesium_Air.glb",
+                5000.0
+              );
+            },
+          },
+          {
+            text: "Drone",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/CesiumDrone/CesiumDrone.glb",
+                150.0
+              );
+            },
+          },
+          {
+            text: "Ground Vehicle",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/GroundVehicle/GroundVehicle.glb",
+                0
+              );
+            },
+          },
+          {
+            text: "Hot Air Balloon",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/CesiumBalloon/CesiumBalloon.glb",
+                1000.0
+              );
+            },
+          },
+          {
+            text: "Milk Truck",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb",
+                0
+              );
+            },
+          },
+          {
+            text: "Skinned Character",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/CesiumMan/Cesium_Man.glb",
+                0
+              );
+            },
+          },
+          {
+            text: "Draco Compressed Model",
+            onselect: function () {
+              createModel(
+                "../../SampleData/models/DracoCompressed/CesiumMilkTruck.gltf",
+                0
+              );
+            },
+          },
+        ];
 
-Sandcastle.addToolbarMenu(options);
-//Sandcastle_End
-Sandcastle.finishedLoading();
-}
-if (typeof Cesium !== "undefined") {
-    startup(Cesium);
-} else if (typeof require === "function") {
-    require(["Cesium"], startup);
-}
-</script>
-</body>
+        Sandcastle.addToolbarMenu(options);
+        //Sandcastle_End
+        Sandcastle.finishedLoading();
+      }
+      if (typeof Cesium !== "undefined") {
+        window.startupCalled = true;
+        startup(Cesium);
+      }
+    </script>
+  </body>
 </html>

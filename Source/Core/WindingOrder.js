@@ -1,41 +1,36 @@
-/*global define*/
-define([
-        './freezeObject'
-    ], function(
-        freezeObject) {
-    "use strict";
+import WebGLConstants from "./WebGLConstants.js";
 
-    /**
-     * Winding order defines the order of vertices for a triangle to be considered front-facing.
-     *
-     * @namespace
-     * @alias WindingOrder
-     */
-    var WindingOrder = {
-        /**
-         * 0x0900. Vertices are in clockwise order.
-         *
-         * @type {Number}
-         * @constant
-         */
-        CLOCKWISE : 0x0900, // WebGL: CW
+/**
+ * Winding order defines the order of vertices for a triangle to be considered front-facing.
+ *
+ * @enum {Number}
+ */
+var WindingOrder = {
+  /**
+   * Vertices are in clockwise order.
+   *
+   * @type {Number}
+   * @constant
+   */
+  CLOCKWISE: WebGLConstants.CW,
 
-        /**
-         * 0x0901. Vertices are in counter-clockwise order.
-         *
-         * @type {Number}
-         * @constant
-         */
-        COUNTER_CLOCKWISE : 0x0901, // WebGL: CCW
+  /**
+   * Vertices are in counter-clockwise order.
+   *
+   * @type {Number}
+   * @constant
+   */
+  COUNTER_CLOCKWISE: WebGLConstants.CCW,
+};
 
-        /**
-         * @private
-         */
-        validate : function(windingOrder) {
-            return windingOrder === WindingOrder.CLOCKWISE ||
-                   windingOrder === WindingOrder.COUNTER_CLOCKWISE;
-        }
-    };
+/**
+ * @private
+ */
+WindingOrder.validate = function (windingOrder) {
+  return (
+    windingOrder === WindingOrder.CLOCKWISE ||
+    windingOrder === WindingOrder.COUNTER_CLOCKWISE
+  );
+};
 
-    return freezeObject(WindingOrder);
-});
+export default Object.freeze(WindingOrder);

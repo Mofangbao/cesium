@@ -1,103 +1,107 @@
-/*global defineSuite*/
-defineSuite([
-        'DataSources/ColorMaterialProperty',
-        'Core/Color',
-        'Core/JulianDate',
-        'Core/TimeInterval',
-        'DataSources/ConstantProperty',
-        'DataSources/TimeIntervalCollectionProperty'
-    ], function(
-        ColorMaterialProperty,
-        Color,
-        JulianDate,
-        TimeInterval,
-        ConstantProperty,
-        TimeIntervalCollectionProperty) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+import { Color } from "../../Source/Cesium.js";
+import { JulianDate } from "../../Source/Cesium.js";
+import { TimeInterval } from "../../Source/Cesium.js";
+import { ColorMaterialProperty } from "../../Source/Cesium.js";
+import { ConstantProperty } from "../../Source/Cesium.js";
+import { TimeIntervalCollectionProperty } from "../../Source/Cesium.js";
 
-    it('constructor provides the expected defaults', function() {
-        var property = new ColorMaterialProperty();
-        expect(property.color).toBeUndefined();
-        expect(property.getType()).toEqual('Color');
-        expect(property.isConstant).toBe(true);
+describe("DataSources/ColorMaterialProperty", function () {
+  it("constructor provides the expected defaults", function () {
+    var property = new ColorMaterialProperty();
+    expect(property.color).toBeUndefined();
+    expect(property.getType()).toEqual("Color");
+    expect(property.isConstant).toBe(true);
 
-        var result = property.getValue();
-        expect(result.color).toEqual(Color.WHITE);
+    var result = property.getValue();
+    expect(result.color).toEqual(Color.WHITE);
 
-        var colorProperty = new ConstantProperty(Color.BLUE);
-        property = new ColorMaterialProperty(colorProperty);
-        expect(property.color).toBe(colorProperty);
-        expect(property.getType()).toEqual('Color');
-        expect(property.isConstant).toBe(true);
-    });
+    var colorProperty = new ConstantProperty(Color.BLUE);
+    property = new ColorMaterialProperty(colorProperty);
+    expect(property.color).toBe(colorProperty);
 
-    it('works with constant values', function() {
-        var property = new ColorMaterialProperty();
-        property.color = new ConstantProperty(Color.RED);
+    property = new ColorMaterialProperty(Color.BLUE);
+    expect(property.color).toBeInstanceOf(ConstantProperty);
+    expect(property.color.getValue()).toEqual(Color.BLUE);
+  });
 
-        var result = property.getValue(JulianDate.now());
-        expect(result.color).toEqual(Color.RED);
-    });
+  it("works with constant values", function () {
+    var property = new ColorMaterialProperty();
+    property.color = new ConstantProperty(Color.RED);
 
-    it('works with dynamic values', function() {
-        var property = new ColorMaterialProperty();
-        property.color = new TimeIntervalCollectionProperty();
+    var result = property.getValue(JulianDate.now());
+    expect(result.color).toEqual(Color.RED);
+  });
 
-        var start = new JulianDate(1, 0);
-        var stop = new JulianDate(2, 0);
-        property.color.intervals.addInterval(new TimeInterval({
-            start : start,
-            stop : stop,
-            data : Color.BLUE
-        }));
+  it("works with dynamic values", function () {
+    var property = new ColorMaterialProperty();
+    property.color = new TimeIntervalCollectionProperty();
 
-        expect(property.isConstant).toBe(false);
+    var start = new JulianDate(1, 0);
+    var stop = new JulianDate(2, 0);
+    property.color.intervals.addInterval(
+      new TimeInterval({
+        start: start,
+        stop: stop,
+        data: Color.BLUE,
+      })
+    );
 
-        var result = property.getValue(start);
-        expect(result.color).toEqual(Color.BLUE);
-    });
+    expect(property.isConstant).toBe(false);
 
-    it('works with a result parameter', function() {
-        var property = new ColorMaterialProperty();
-        property.color = new ConstantProperty(Color.RED);
+    var result = property.getValue(start);
+    expect(result.color).toEqual(Color.BLUE);
+  });
 
-        var result = {
-            color : Color.BLUE.clone()
-        };
-        var returnedResult = property.getValue(JulianDate.now(), result);
-        expect(returnedResult).toBe(result);
-        expect(result.color).toEqual(Color.RED);
-    });
+  it("works with a result parameter", function () {
+    var property = new ColorMaterialProperty();
+    property.color = new ConstantProperty(Color.RED);
 
-    it('equals works', function() {
-        var left = new ColorMaterialProperty();
-        left.color = new ConstantProperty(Color.WHITE);
+    var result = {
+      color: Color.BLUE.clone(),
+    };
+    var returnedResult = property.getValue(JulianDate.now(), result);
+    expect(returnedResult).toBe(result);
+    expect(result.color).toEqual(Color.RED);
+  });
 
-        var right = new ColorMaterialProperty();
-        right.color = new ConstantProperty(Color.WHITE);
-        expect(left.equals(right)).toEqual(true);
+  it("equals works", function () {
+    var left = new ColorMaterialProperty();
+    left.color = new ConstantProperty(Color.WHITE);
 
-        right.color = new ConstantProperty(Color.BLACK);
-        expect(left.equals(right)).toEqual(false);
-    });
+    var right = new ColorMaterialProperty();
+    right.color = new ConstantProperty(Color.WHITE);
+    expect(left.equals(right)).toEqual(true);
 
-    it('raises definitionChanged when a color property is assigned or modified', function() {
-        var property = new ColorMaterialProperty();
+    right.color = new ConstantProperty(Color.BLACK);
+    expect(left.equals(right)).toEqual(false);
+  });
 
-        var listener = jasmine.createSpy('listener');
-        property.definitionChanged.addEventListener(listener);
+  it("raises definitionChanged when a color property is assigned or modified", function () {
+    var property = new ColorMaterialProperty();
 
-        var oldValue = property.color;
-        property.color = new ConstantProperty(Color.WHITE);
-        expect(listener).toHaveBeenCalledWith(property, 'color', property.color, oldValue);
-        listener.reset();
+    var listener = jasmine.createSpy("listener");
+    property.definitionChanged.addEventListener(listener);
 
-        property.color.setValue(Color.BLACK);
-        expect(listener).toHaveBeenCalledWith(property, 'color', property.color, property.color);
-        listener.reset();
+    var oldValue = property.color;
+    property.color = new ConstantProperty(Color.WHITE);
+    expect(listener).toHaveBeenCalledWith(
+      property,
+      "color",
+      property.color,
+      oldValue
+    );
+    listener.calls.reset();
 
-        property.color = property.color;
-        expect(listener.callCount).toEqual(0);
-    });
+    property.color.setValue(Color.BLACK);
+    expect(listener).toHaveBeenCalledWith(
+      property,
+      "color",
+      property.color,
+      property.color
+    );
+    listener.calls.reset();
+
+    property.color = property.color;
+    expect(listener.calls.count()).toEqual(0);
+  });
 });

@@ -1,56 +1,37 @@
-/*global define*/
-define([
-        './freezeObject'
-    ], function(
-        freezeObject) {
-    "use strict";
+/**
+ * Style options for corners.
+ *
+ * @demo The {@link https://sandcastle.cesium.com/index.html?src=Corridor.html&label=Geometries|Corridor Demo}
+ * demonstrates the three corner types, as used by {@link CorridorGraphics}.
+ *
+ * @enum {Number}
+ */
+var CornerType = {
+  /**
+   * <img src="Images/CornerTypeRounded.png" style="vertical-align: middle;" width="186" height="189" />
+   *
+   * Corner has a smooth edge.
+   * @type {Number}
+   * @constant
+   */
+  ROUNDED: 0,
 
-    /**
-     * Style options for corners.
-     *
-     * @namespace
-     * @alias CornerType
-     */
-    var CornerType = {
-        /**
-         * <pre>
-         *  _____
-         * (  ___
-         * | |
-         * </pre>
-         *
-         * Corner is circular.
-         * @type {Number}
-         * @constant
-         */
-        ROUNDED : 0,
+  /**
+   * <img src="Images/CornerTypeMitered.png" style="vertical-align: middle;" width="186" height="189" />
+   *
+   * Corner point is the intersection of adjacent edges.
+   * @type {Number}
+   * @constant
+   */
+  MITERED: 1,
 
-        /**
-         * <pre>
-         *  ______
-         * |  ____
-         * | |
-         * </pre>
-         *
-         * Corner point is the intersection of adjacent edges.
-         * @type {Number}
-         * @constant
-         */
-        MITERED : 1,
-
-        /**
-         * <pre>
-         *  _____
-         * /  ___
-         * | |
-         * </pre>
-         *
-         * Corner is clipped.
-         * @type {Number}
-         * @constant
-         */
-        BEVELED : 2
-    };
-
-    return freezeObject(CornerType);
-});
+  /**
+   * <img src="Images/CornerTypeBeveled.png" style="vertical-align: middle;" width="186" height="189" />
+   *
+   * Corner is clipped.
+   * @type {Number}
+   * @constant
+   */
+  BEVELED: 2,
+};
+export default Object.freeze(CornerType);

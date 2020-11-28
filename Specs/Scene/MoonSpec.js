@@ -1,100 +1,81 @@
-/*global defineSuite*/
-defineSuite([
-        'Scene/Moon',
-        'Core/Cartesian3',
-        'Core/defined',
-        'Core/Ellipsoid',
-        'Core/Matrix3',
-        'Core/Simon1994PlanetaryPositions',
-        'Core/Transforms',
-        'Specs/createCamera',
-        'Specs/createFrameState',
-        'Specs/createScene',
-        'Specs/destroyScene'
-    ], function(
-        Moon,
-        Cartesian3,
-        defined,
-        Ellipsoid,
-        Matrix3,
-        Simon1994PlanetaryPositions,
-        Transforms,
-        createCamera,
-        createFrameState,
-        createScene,
-        destroyScene) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+import { BoundingSphere } from "../../Source/Cesium.js";
+import { Color } from "../../Source/Cesium.js";
+import { defined } from "../../Source/Cesium.js";
+import { Ellipsoid } from "../../Source/Cesium.js";
+import { Matrix3 } from "../../Source/Cesium.js";
+import { Simon1994PlanetaryPositions } from "../../Source/Cesium.js";
+import { Transforms } from "../../Source/Cesium.js";
+import { Moon } from "../../Source/Cesium.js";
+import createScene from "../createScene.js";
 
+describe(
+  "Scene/Moon",
+  function () {
     var scene;
+    var backgroundColor = [255, 0, 0, 255];
 
-    beforeAll(function() {
-        scene = createScene();
+    beforeAll(function () {
+      scene = createScene();
+      Color.unpack(backgroundColor, 0, scene.backgroundColor);
     });
 
-    afterAll(function() {
-        destroyScene(scene);
+    afterAll(function () {
+      scene.destroyForSpecs();
     });
 
     function lookAtMoon(camera, date) {
-        var icrfToFixed = new Matrix3();
-        if (!defined(Transforms.computeIcrfToFixedMatrix(date, icrfToFixed))) {
-            Transforms.computeTemeToPseudoFixedMatrix(date, icrfToFixed);
-        }
+      var icrfToFixed = new Matrix3();
+      if (!defined(Transforms.computeIcrfToFixedMatrix(date, icrfToFixed))) {
+        Transforms.computeTemeToPseudoFixedMatrix(date, icrfToFixed);
+      }
 
-        var moonPosition = Simon1994PlanetaryPositions.computeMoonPositionInEarthInertialFrame(date);
-        Matrix3.multiplyByVector(icrfToFixed, moonPosition, moonPosition);
-        var cameraPosition = Cartesian3.multiplyByScalar(Cartesian3.normalize(moonPosition, new Cartesian3()), 1e7, new Cartesian3());
+      var moonPosition = Simon1994PlanetaryPositions.computeMoonPositionInEarthInertialFrame(
+        date
+      );
+      Matrix3.multiplyByVector(icrfToFixed, moonPosition, moonPosition);
 
-        camera.lookAt(moonPosition, cameraPosition, Cartesian3.UNIT_Z);
+      camera.viewBoundingSphere(
+        new BoundingSphere(moonPosition, Ellipsoid.MOON.maximumRadius)
+      );
     }
 
-    it('default constructs the moon', function() {
-        var moon = new Moon();
-        expect(moon.show).toEqual(true);
-        expect(moon.textureUrl).toContain('Assets/Textures/moonSmall.jpg');
-        expect(moon.ellipsoid).toBe(Ellipsoid.MOON);
-        expect(moon.onlySunLighting).toEqual(true);
+    it("default constructs the moon", function () {
+      var moon = new Moon();
+      expect(moon.show).toEqual(true);
+      expect(moon.textureUrl).toContain("Assets/Textures/moonSmall.jpg");
+      expect(moon.ellipsoid).toBe(Ellipsoid.MOON);
+      expect(moon.onlySunLighting).toEqual(true);
     });
 
-    it('draws in 3D', function() {
-        scene.moon = new Moon();
-        scene.renderForSpecs();
+    it("draws in 3D", function () {
+      expect(scene).toRender(backgroundColor);
+      scene.moon = new Moon();
 
-        var date = scene.frameState.time;
-        var camera = scene.camera;
-        lookAtMoon(camera, date);
+      lookAtMoon(scene.camera, scene.frameState.time);
 
-        expect(scene.renderForSpecs()).toNotEqual([0, 0, 0, 0]);
+      expect(scene).notToRender(backgroundColor);
+      scene.moon = scene.moon.destroy();
     });
 
-    it('does not render when show is false', function() {
-        var moon = new Moon();
-        moon.show = false;
+    it("does not render when show is false", function () {
+      expect(scene).toRender(backgroundColor);
+      scene.moon = new Moon();
 
-        var frameState = createFrameState(createCamera({
-            near : 1.0,
-            far : 1.0e10
-        }));
-        var context = scene.context;
-        var us = context.uniformState;
-        us.update(context, frameState);
+      lookAtMoon(scene.camera, scene.frameState.time);
 
-        lookAtMoon(scene.camera, frameState.time);
+      expect(scene).notToRender(backgroundColor);
+      scene.moon.show = false;
 
-        us.update(context, frameState);
-
-        var commandList = [];
-        moon.update(context, frameState, commandList);
-        expect(commandList.length).toEqual(0);
-
-        moon.destroy();
+      expect(scene).toRender(backgroundColor);
+      scene.moon = scene.moon.destroy();
     });
 
-    it('isDestroyed', function() {
-        var moon = new Moon();
-        expect(moon.isDestroyed()).toEqual(false);
-        moon.destroy();
-        expect(moon.isDestroyed()).toEqual(true);
+    it("isDestroyed", function () {
+      var moon = new Moon();
+      expect(moon.isDestroyed()).toEqual(false);
+      moon.destroy();
+      expect(moon.isDestroyed()).toEqual(true);
     });
-}, 'WebGL');
+  },
+  "WebGL"
+);

@@ -22,8 +22,6 @@
  *   limitations under the License.
  *
  */
-/*global define*/
-define(function() {
 
 	/**
 	 * Constructs a URI object.
@@ -46,8 +44,7 @@ define(function() {
 			this.query = c[4];
 			this.fragment = c[5];
 		}
-	};
-
+	}
 	// Initial values on the prototype
 	URI.prototype.scheme    = null;
 	URI.prototype.authority = null;
@@ -273,5 +270,4 @@ define(function() {
 		return result;
 	};
 
-return URI;
-});
+export default URI;

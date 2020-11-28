@@ -1,91 +1,79 @@
-/*global defineSuite*/
-defineSuite([
-        'Scene/EllipsoidSurfaceAppearance',
-        'Core/ColorGeometryInstanceAttribute',
-        'Core/GeometryInstance',
-        'Core/Rectangle',
-        'Core/RectangleGeometry',
-        'Renderer/ClearCommand',
-        'Scene/Appearance',
-        'Scene/Material',
-        'Scene/Primitive',
-        'Specs/createContext',
-        'Specs/createFrameState',
-        'Specs/destroyContext',
-        'Specs/render'
-    ], function(
-        EllipsoidSurfaceAppearance,
-        ColorGeometryInstanceAttribute,
-        GeometryInstance,
-        Rectangle,
-        RectangleGeometry,
-        ClearCommand,
-        Appearance,
-        Material,
-        Primitive,
-        createContext,
-        createFrameState,
-        destroyContext,
-        render) {
-    "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn,runs,waits,waitsFor*/
+import { ColorGeometryInstanceAttribute } from "../../Source/Cesium.js";
+import { GeometryInstance } from "../../Source/Cesium.js";
+import { Rectangle } from "../../Source/Cesium.js";
+import { RectangleGeometry } from "../../Source/Cesium.js";
+import { Appearance } from "../../Source/Cesium.js";
+import { EllipsoidSurfaceAppearance } from "../../Source/Cesium.js";
+import { Material } from "../../Source/Cesium.js";
+import { Primitive } from "../../Source/Cesium.js";
+import createScene from "../createScene.js";
 
-    var context;
-    var frameState;
+describe(
+  "Scene/EllipsoidSurfaceAppearance",
+  function () {
+    var scene;
+    var rectangle;
     var primitive;
 
-    beforeAll(function() {
-        context = createContext();
-        frameState = createFrameState();
+    beforeAll(function () {
+      scene = createScene();
+      scene.primitives.destroyPrimitives = false;
+      scene.frameState.scene3DOnly = false;
 
-        var rectangle = Rectangle.fromDegrees(-10.0, -10.0, 10.0, 10.0);
-        primitive = new Primitive({
-            geometryInstances : new GeometryInstance({
-                geometry : new RectangleGeometry({
-                    rectangle : rectangle,
-                    vertexFormat : EllipsoidSurfaceAppearance.VERTEX_FORMAT
-                }),
-                attributes : {
-                    color : new ColorGeometryInstanceAttribute(1.0, 1.0, 0.0, 1.0)
-                }
-            }),
-            asynchronous : false
-        });
-
-        frameState.camera.viewRectangle(rectangle);
-        var us = context.uniformState;
-        us.update(context, frameState);
+      rectangle = Rectangle.fromDegrees(-10.0, -10.0, 10.0, 10.0);
     });
 
-    afterAll(function() {
-        primitive = primitive && primitive.destroy();
-        destroyContext(context);
+    beforeEach(function () {
+      scene.camera.setView({ destination: rectangle });
     });
 
-    it('constructor', function() {
-        var a = new EllipsoidSurfaceAppearance();
-
-        expect(a.material).toBeDefined();
-        expect(a.material.type).toEqual(Material.ColorType);
-        expect(a.vertexShaderSource).toBeDefined();
-        expect(a.fragmentShaderSource).toBeDefined();
-        expect(a.renderState).toEqual(Appearance.getDefaultRenderState(true, true));
-        expect(a.vertexFormat).toEqual(EllipsoidSurfaceAppearance.VERTEX_FORMAT);
-        expect(a.flat).toEqual(false);
-        expect(a.faceForward).toEqual(false);
-        expect(a.translucent).toEqual(true);
-        expect(a.aboveGround).toEqual(false);
-        expect(a.closed).toEqual(false);
+    afterAll(function () {
+      scene.destroyForSpecs();
     });
 
-    it('renders', function() {
-        primitive.appearance = new EllipsoidSurfaceAppearance();
-
-        ClearCommand.ALL.execute(context);
-        expect(context.readPixels()).toEqual([0, 0, 0, 0]);
-
-        render(context, frameState, primitive);
-        expect(context.readPixels()).not.toEqual([0, 0, 0, 0]);
+    afterEach(function () {
+      scene.primitives.removeAll();
+      primitive = primitive && !primitive.isDestroyed() && primitive.destroy();
     });
 
-}, 'WebGL');
+    it("constructor", function () {
+      var a = new EllipsoidSurfaceAppearance();
+
+      expect(a.material).toBeDefined();
+      expect(a.material.type).toEqual(Material.ColorType);
+      expect(a.vertexShaderSource).toBeDefined();
+      expect(a.fragmentShaderSource).toBeDefined();
+      expect(a.renderState).toEqual(
+        Appearance.getDefaultRenderState(true, true)
+      );
+      expect(a.vertexFormat).toEqual(EllipsoidSurfaceAppearance.VERTEX_FORMAT);
+      expect(a.flat).toEqual(false);
+      expect(a.faceForward).toEqual(false);
+      expect(a.translucent).toEqual(true);
+      expect(a.aboveGround).toEqual(false);
+      expect(a.closed).toEqual(false);
+    });
+
+    it("renders", function () {
+      primitive = new Primitive({
+        geometryInstances: new GeometryInstance({
+          geometry: new RectangleGeometry({
+            rectangle: rectangle,
+            vertexFormat: EllipsoidSurfaceAppearance.VERTEX_FORMAT,
+          }),
+          attributes: {
+            color: new ColorGeometryInstanceAttribute(1.0, 1.0, 0.0, 1.0),
+          },
+        }),
+        asynchronous: false,
+      });
+      primitive.appearance = new EllipsoidSurfaceAppearance();
+
+      expect(scene).toRender([0, 0, 0, 255]);
+
+      scene.primitives.add(primitive);
+      expect(scene).notToRender([0, 0, 0, 255]);
+    });
+  },
+  "WebGL"
+);
